@@ -78,10 +78,10 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
         onlyOwner()
         returns (bool)
     {
-        require(timestamp > block.timestamp, 'minimum is less then current timestamp');
+        require(timestamp > block.timestamp, 'timestamp is less then current block.timestamp');
         
         clearMinimums(addr);
-        require(users[addr].indexes.add(timestamp) == true, 'minimum already exist');
+        require(users[addr].indexes.add(timestamp), 'minimum already exist');
         
         //users[addr].data[timestamp] = minimum;
         users[addr].data[timestamp].timestampStart = block.timestamp;
@@ -91,8 +91,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
         return true;
         
     }
-    
-    
+ 
     /**
     * @dev Checks if transfer passes transfer rules.
     *
@@ -106,6 +105,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
         uint256 value
     ) 
         public 
+        view
         returns (bool) 
     {
         
@@ -143,16 +143,13 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
             if (block.timestamp <= users[addr].data[mapIndex].timestampEnd) {
                 if (users[addr].data[mapIndex].gradual == true) {
                     
-                    iMinimum = iMinimum.sub(
-                        (
-                            iMinimum.
-                            div(
-                                users[addr].data[mapIndex].timestampEnd.sub(users[addr].data[mapIndex].timestampStart)
-                            )
-                        ).mul(
-                            users[addr].data[mapIndex].timestampEnd.sub(block.timestamp)
-                        )
-                    );
+                        iMinimum = iMinimum.div(
+                                        users[addr].data[mapIndex].timestampEnd.sub(users[addr].data[mapIndex].timestampStart)
+                                        ).
+                                     mul(
+                                        users[addr].data[mapIndex].timestampEnd.sub(block.timestamp)
+                                        );
+                       
                 }
                 
                 ret = ret.add(iMinimum);
@@ -180,7 +177,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
                 mapIndex = users[addr].indexes.at(i-1);
                 if (block.timestamp > users[addr].data[mapIndex].timestampEnd) {
                     delete users[addr].data[mapIndex];
-                    users[addr].indexes.remove(mapIndex);
+                    users[addr].indexes.remove(i-1);
                 }
                 
             }
@@ -204,7 +201,6 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
         return true;
     }
 
-
     /**
     * @dev Do transfer and checks where funds should go. If both from and to are
     * on the whitelist funds should be transferred but if one of them are on the
@@ -225,9 +221,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules {
         returns (bool) 
     {
         require(authorize(from, to, value), "Transfer not authorized");
-
         require(ISRC20(_src20).executeTransfer(from, to, value), "SRC20 transfer failed");
-
         return true;
     }
 	
