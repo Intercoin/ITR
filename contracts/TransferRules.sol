@@ -230,8 +230,18 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         onlyOwner()
     {
         users[from].lockup.duration = daysAmount.mul(dayInSeconds);
+        users[from].lockup.exists = true;
+    }
+    
+    function automaticLockupRemove(
+        address from
+    )
+        public 
+        onlyOwner()
+    {
         users[from].lockup.exists = false;
     }
+    
     
     /**
      * @dev whenever anyone on whitelist receives 
