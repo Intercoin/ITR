@@ -83,7 +83,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     
     
     /**
-    * @dev view minimum sender for period from now to timestamp.
+    * @dev viewing minimum holding in sender during period from now to timestamp.
     */
     function minimumsView(
     ) 
@@ -95,7 +95,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     }
     
     /**
-    * @dev add minimum to sender for period from now to timestamp.
+    * @dev adding minimum holding at sender during period from now to timestamp.
     *
     * @param addr address which should be restricted
     * @param amount amount.
@@ -191,7 +191,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     }    
     
     /**
-     * Adding addresses list from whitelist
+     * Adding addresses list to whitelist
      * 
      * @dev Available from whitelist with group 'managers'(managersGroupName) only
      * 
