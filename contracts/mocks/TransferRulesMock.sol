@@ -13,26 +13,34 @@ contract TransferRulesMock is TransferRules {
         
         
         uint256 mapIndex = 0;
-        ret = new uint256[](users[addr].indexes.length());
-        ret2 = new uint256[](users[addr].indexes.length());
-        for (uint256 i=0; i<users[addr].indexes.length(); i++) {
+        ret = new uint256[](users[addr].minimumsIndexes.length());
+        ret2 = new uint256[](users[addr].minimumsIndexes.length());
+        for (uint256 i=0; i<users[addr].minimumsIndexes.length(); i++) {
             
-            mapIndex = users[addr].indexes.at(i);
-            ret[i] = users[addr].data[mapIndex].minimum;
-            ret2[i] = users[addr].data[mapIndex].timestampEnd;
-            // ret[i].timestampStart = users[addr].data[mapIndex].timestampStart;
-            // ret[i].timestampEnd = users[addr].data[mapIndex].timestampEnd;
-            // ret[i].minimum = users[addr].data[mapIndex].minimum;
-            // ret[i].gradual = users[addr].data[mapIndex].gradual;
+            mapIndex = users[addr].minimumsIndexes.at(i);
+            ret[i] = users[addr].minimums[mapIndex].amount;
+            ret2[i] = users[addr].minimums[mapIndex].timestampEnd;
             
-    
         }
         //return ret;
             
     }
     
-    function getInitParams() public view returns(uint256, uint256) {
-        return (durationLockupUSAPerson,durationLockupNoneUSAPerson);
+    
+    function isWhitelistedMock(string memory groupName, address addr) public view returns (bool) {
+        return _isWhitelisted(groupName, addr);
     }
+    
+    function getManagersGroupName() public view returns(string memory) {
+        return managersGroupName;
+    }
+    
+    function getLockup(address from) public view returns(uint256, bool) {
+        return (
+            users[from].lockup.duration,
+            users[from].lockup.exists
+        );
+    }
+    
 }
     

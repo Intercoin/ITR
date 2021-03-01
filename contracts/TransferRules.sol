@@ -7,12 +7,13 @@ import "@openzeppelin/contracts-ethereum-package/contracts/math/Math.sol";
 import "./interfaces/ISRC20.sol";
 import "./interfaces/ITransferRules.sol";
 import "./Whitelist.sol";
+import "./IntercoinTrait.sol";
 
 /*
  * @title TransferRules contract
  * @dev Contract that is checking if on-chain rules for token transfers are concluded.
  */
-contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whitelist {
+contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whitelist, IntercoinTrait {
 
 	ISRC20 public _src20;
 	using SafeMath for uint256;
@@ -38,7 +39,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     }
     
     struct whitelistSettings {
-        uint256 reduceTimestamp;
+        uint256 reducePeriod;
         //bool alsoGradual;// does not used 
         bool exists;
     }
@@ -47,6 +48,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     mapping (address => UserStruct) users;
     
     uint256 internal dayInSeconds;
+    string  internal managersGroupName;
     
     modifier onlySRC20 {
         require(msg.sender == address(_src20));
@@ -66,6 +68,17 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         initializer 
     {
         __TransferRules_init();
+    }
+    
+    /**
+    * @dev clean SRC20. available only for owner
+    */
+    function cleanSRC(
+    ) 
+        public
+        onlyOwner()
+    {
+        _src20 = ISRC20(address(0));
     }
     
     
@@ -160,7 +173,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         onlyOwner
         returns(bool)
     {
-        return _whitelistAdd('managers',addresses);
+        return _whitelistAdd(managersGroupName, addresses);
     }     
     
     /**
@@ -174,13 +187,13 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         onlyOwner
         returns(bool)
     {
-        return _whitelistRemove('managers',addresses);
+        return _whitelistRemove(managersGroupName, addresses);
     }    
     
     /**
      * Adding addresses list from whitelist
      * 
-     * @dev Available from whitelist with group 'managers' only
+     * @dev Available from whitelist with group 'managers'(managersGroupName) only
      * 
      * @param addresses list of addresses which will be added to whitelist
      * @return success return true in any cases 
@@ -190,7 +203,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     )
         public 
         override 
-        onlyWhitelist('managers') 
+        onlyWhitelist(managersGroupName) 
         returns (bool success) 
     {
         success = _whitelistAdd(commonGroupName, addresses);
@@ -199,7 +212,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     /**
      * Removing addresses list from whitelist
      * 
-     * @dev Available from whitelist with group 'managers' only
+     * @dev Available from whitelist with group 'managers'(managersGroupName) only
      * Requirements:
      *
      * - `addresses` cannot contains the zero address.
@@ -212,14 +225,14 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     ) 
         public 
         override 
-        onlyWhitelist('managers') 
+        onlyWhitelist(managersGroupName) 
         returns (bool success) 
     {
         success = _whitelistRemove(commonGroupName, addresses);
     }
     
     /**
-     * @param from will add automatic lockup for destination address sent sent address from
+     * @param from will add automatic lockup for destination address sent address from
      * @param daysAmount duration in days
      */
     function automaticLockupAdd(
@@ -233,6 +246,9 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         users[from].lockup.exists = true;
     }
     
+    /**
+     * @param from remove automaticLockup from address 
+     */
     function automaticLockupRemove(
         address from
     )
@@ -244,9 +260,8 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     
     
     /**
-     * @dev whenever anyone on whitelist receives 
-     * if alsoGradual is true then even gradual lockups are reduced, otherwise they stay
-     * @param daysAmount duration in days
+     * @dev whenever anyone on whitelist receives tokens their lockup time reduce to daysAmount(if less)
+     * @param daysAmount duration in days. if equal 0 then reduce mechanizm are removed
      */
     function whitelistReduce(
         uint256 daysAmount
@@ -255,9 +270,9 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         onlyOwner()
     {
         if (daysAmount == 0) {
-            
+            settings.exists = false;    
         } else {
-            settings.reduceTimestamp = daysAmount.mul(dayInSeconds);
+            settings.reducePeriod = daysAmount.mul(dayInSeconds);
             settings.exists = true;    
         }
         
@@ -279,6 +294,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         __Whitelist_init();
         
         dayInSeconds = 86400;
+        managersGroupName = 'managers';
     }
     
     /**
@@ -382,7 +398,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         }
         return true;
     }
-    
+
     /**
      * added minimum if not exist by timestamp else append it
      * @param receiver destination address
@@ -398,6 +414,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     )
         internal
     {
+
         if (users[receiver].minimumsIndexes.add(timestampEnd) == true) {
             users[receiver].minimums[timestampEnd].timestampStart = block.timestamp;
             users[receiver].minimums[timestampEnd].amount = value;
@@ -497,7 +514,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
                     (
                     settings.exists
                     ?
-                    automaticLockupDuration.min(settings.reduceTimestamp) 
+                    automaticLockupDuration.min(settings.reducePeriod) 
                     :
                     automaticLockupDuration
                     )
@@ -507,8 +524,8 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
             
             _appendMinimum(
                 to,
-                value, 
                 untilTimestamp,
+                value, 
                 false   //bool gradual
             );
             
@@ -530,7 +547,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
                     to, 
                     value, 
                     true, 
-                    block.timestamp.add(settings.reduceTimestamp)
+                    block.timestamp.add(settings.reducePeriod)
                 );
             }
             

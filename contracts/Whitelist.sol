@@ -79,7 +79,7 @@ contract Whitelist is OwnableUpgradeSafe {
     * @param addr address
     * @return result return true if exist 
     */
-    function isWhitelisted(address addr) public view returns (bool result) {
+    function isWhitelisted(address addr) public virtual view returns (bool result) {
         result = _isWhitelisted(commonGroupName, addr);
     }
     
