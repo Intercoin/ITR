@@ -1,12 +1,18 @@
-pragma solidity ^0.6.0;
+// SPDX-License-Identifier: MIT
 
-import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/ERC20.sol";
+pragma solidity >=0.7.0 <0.8.0;
+
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 
 import "../interfaces/ITransferRestrictions.sol";
 import "../interfaces/ITransferRules.sol";
 
-contract ExternalItrImitationMock is ERC20UpgradeSafe {
-    
+contract ExternalItrImitationMock is ERC20Upgradeable {
+    using SafeMathUpgradeable for uint256;
+	using MathUpgradeable for uint256;
+	
     /**
      * Configured contract implementing token restriction(s).
      * If set, transferToken will consult this contract should transfer

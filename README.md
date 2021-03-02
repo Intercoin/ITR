@@ -25,7 +25,7 @@ once installed will be use methods:
 	<tr>
 		<td><a href="#minimumsview">minimumsView</a></td>
 		<td>anyone</td>
-		<td>viewing minimums holding in sender during period from now to timestamp</td>
+		<td>viewing minimums holding in address sender during period from now to timestamp</td>
 	</tr>
 	<tr>
 		<td><a href="#automaticlockupadd">automaticLockupAdd</a></td>
@@ -92,7 +92,12 @@ clean SRC20. available only for owner
       
 ### minimumsView
 
-returning minimum holding in sender during period from now to timestamp.
+returning minimum holding in address sender during period from now to timestamp.
+
+Params:
+name  | type | description
+--|--|--
+addr|address|address sender
 
 ### minimumsAdd
 

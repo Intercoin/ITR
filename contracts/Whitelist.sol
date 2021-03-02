@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.2;
 
-import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/utils/EnumerableSet.sol";
+pragma solidity >=0.6.0 <0.8.0;
+
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 /**
  * Realization a addresses whitelist
  * 
  */
-contract Whitelist is OwnableUpgradeSafe {
-    using SafeMath for uint256;
-    using EnumerableSet for EnumerableSet.AddressSet;
+contract Whitelist is OwnableUpgradeable {
+    using SafeMathUpgradeable for uint256;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
     
     struct List {
         address addr;
         bool alsoGradual;
     }
     struct ListStruct {
-        EnumerableSet.AddressSet indexes;
+        EnumerableSetUpgradeable.AddressSet indexes;
         mapping(address => List) data;
     }
     

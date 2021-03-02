@@ -1,4 +1,5 @@
-
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.6.0 <0.8.0;
 /**
  * @title ITransferRules interface
  * @dev Represents interface for any on-chain SRC20 transfer rules

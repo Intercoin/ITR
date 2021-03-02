@@ -1,24 +1,29 @@
-pragma solidity ^0.6.2;
-import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/utils/EnumerableSet.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/math/Math.sol";
+// SPDX-License-Identifier: MIT
+
+pragma solidity >=0.7.0 <0.8.0;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 
 import "./interfaces/ISRC20.sol";
 import "./interfaces/ITransferRules.sol";
 import "./Whitelist.sol";
 import "./IntercoinTrait.sol";
 
+
+
 /*
  * @title TransferRules contract
  * @dev Contract that is checking if on-chain rules for token transfers are concluded.
  */
-contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whitelist, IntercoinTrait {
+contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whitelist, IntercoinTrait {
 
 	ISRC20 public _src20;
-	using SafeMath for uint256;
-	using Math for uint256;
-	using EnumerableSet for EnumerableSet.UintSet;
+	using SafeMathUpgradeable for uint256;
+	using MathUpgradeable for uint256;
+	using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
 	
     struct Lockup {
         uint256 duration;
@@ -33,7 +38,7 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         bool gradual;
     }
     struct UserStruct {
-        EnumerableSet.UintSet minimumsIndexes;
+        EnumerableSetUpgradeable.UintSet minimumsIndexes;
         mapping(uint256 => Minimum) minimums;
         Lockup lockup;
     }
@@ -83,15 +88,16 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
     
     
     /**
-    * @dev viewing minimum holding in sender during period from now to timestamp.
+    * @dev viewing minimum holding in addr sener during period from now to timestamp.
     */
     function minimumsView(
+        address addr
     ) 
         public
         view
         returns (uint256)
     {
-        return getMinimum(_msgSender());
+        return getMinimum(addr);
     }
     
     /**
@@ -380,7 +386,6 @@ contract TransferRules is Initializable, OwnableUpgradeSafe, ITransferRules, Whi
         internal 
         returns (bool) 
     {
-        uint256 iMinimum = 0;
         uint256 mapIndex = 0;
         uint256 len = users[addr].minimumsIndexes.length();
         if (len > 0) {

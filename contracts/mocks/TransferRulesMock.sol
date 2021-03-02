@@ -1,5 +1,9 @@
-pragma solidity ^0.6.2;
+// SPDX-License-Identifier: MIT
+
+pragma solidity >=0.7.0 <0.8.0;
 pragma experimental ABIEncoderV2;
+
+import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 
 import "../TransferRules.sol";
 /*
@@ -9,9 +13,10 @@ import "../TransferRules.sol";
  */
 contract TransferRulesMock is TransferRules {
     
+	using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
+    
     function getMinimumsList(address addr) public view returns (uint256[] memory ret, uint256[] memory ret2 ) {
-        
-        
+         
         uint256 mapIndex = 0;
         ret = new uint256[](users[addr].minimumsIndexes.length());
         ret2 = new uint256[](users[addr].minimumsIndexes.length());

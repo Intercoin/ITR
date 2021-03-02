@@ -353,7 +353,7 @@ contract('TransferRules', (accounts) => {
         // in total passed 4 days  so tokens will be available for none-whitelist person
         await ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree});
         
-        t = await TransferRulesInstance.minimumsView({from: accountFourth});
+        t = await TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
         assert.equal(t.toString(), BigNumber(0).toString(), ' minimums are not equal zero for accountFourth');
         
         t = await ExternalItrImitationMockInstance.balanceOf(accountFourth, {from: accountFourth});
@@ -426,7 +426,7 @@ contract('TransferRules', (accounts) => {
 // t = await TransferRulesInstance.authorize(accountFourth, accountFive, BigNumber(500*1e18), {from: accountFourth});
 // console.log(tmpBool);
 
-// t = await TransferRulesInstance.minimumsView({from: accountFourth});
+// t = await TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
 // console.log(t.toString());
     
     
