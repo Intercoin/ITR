@@ -72,7 +72,6 @@ once installed will be use methods:
 		<td>owner</td>
 		<td>whenever anyone on whitelist receives tokens their lockup time reduce</td>
 	</tr>
-	
 	<tr>
 		<td><a href="#whitelistadd">whitelistAdd</a></td>
 		<td>managers</td>
@@ -203,7 +202,7 @@ daysAmount|uint256|duration in days
         
 ### dailyRate
 
-setup limit sell amount of their tokens per daysAmount 
+setup limit sell `amount` of their tokens per `daysAmount`
 
 Params:
 name  | type | description
