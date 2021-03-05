@@ -40,6 +40,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     struct UserStruct {
         EnumerableSetUpgradeable.UintSet minimumsIndexes;
         mapping(uint256 => Minimum) minimums;
+        mapping(uint256 => uint256) dailyAmounts;
         Lockup lockup;
     }
     
@@ -49,7 +50,19 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         bool exists;
     }
     
-    whitelistSettings settings;
+    struct DailyRate {
+        uint256 amount;
+        uint256 daysAmount;
+        bool exists;
+    }
+    
+    struct Settings {
+        whitelistSettings whitelist;
+        DailyRate dailyRate;
+    }
+    
+    //whitelistSettings settings;
+    Settings settings;
     mapping (address => UserStruct) users;
     
     uint256 internal dayInSeconds;
@@ -95,7 +108,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     ) 
         public
         view
-        returns (uint256)
+        returns (uint256, uint256)
     {
         return getMinimum(addr);
     }
@@ -276,12 +289,34 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         onlyOwner()
     {
         if (daysAmount == 0) {
-            settings.exists = false;    
+            settings.whitelist.exists = false;    
         } else {
-            settings.reducePeriod = daysAmount.mul(dayInSeconds);
-            settings.exists = true;    
+            settings.whitelist.reducePeriod = daysAmount.mul(dayInSeconds);
+            settings.whitelist.exists = true;    
         }
         
+    }
+    
+    /**
+     * setup limit sell amount of their tokens per daysAmount 
+     * @param amount
+     * @param daysAmount
+     */
+    function dailyRate(
+        uint256 amount,
+        uint256 daysAmount
+    )
+        public 
+        onlyOwner()
+    {
+        if (daysAmount == 0) {
+            settings.dailyRate.exists = false;    
+        } else {
+            settings.dailyRate.amount = amount;    
+            settings.dailyRate.daysAmount = daysAmount;
+            settings.dailyRate.exists = true;    
+        }
+          
     }
 
     //---------------------------------------------------------------------------------
@@ -304,11 +339,15 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     }
     
     /**
-    * @param from The address to transfer from.
-    * @param to The address to send tokens to.
-    * @param value The amount of tokens to send.
-    * @param balanceOfFrom balance at from before transfer
-    */
+     * return true if 
+     *  overall balance is enough 
+     *  AND balance rest >= sum of gradual limits 
+     *  AND rest >= none-gradual(except if destination is in whitelist) 
+     * @param from The address to transfer from.
+     * @param to The address to send tokens to.
+     * @param value The amount of tokens to send.
+     * @param balanceOfFrom balance at from before transfer
+     */
     function _authorize(
         address from, 
         address to, 
@@ -320,23 +359,46 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         returns (bool) 
     {
 
-        if (
-            (balanceOfFrom >= value) && 
-            (
-                (isWhitelisted(to)) ||
-                (getMinimum(from) <= balanceOfFrom.sub(value))
-            )
-            
-        ) {
-            return true;
+        (uint256 sumMinimum, uint256 sumGradual) = getMinimum(from);
+
+        uint256 dailyAmountsForPeriod = 0;
+        uint256 currentBeginOfTheDay = beginOfTheCurrentDay();
+        if (settings.dailyRate.exists == true && settings.dailyRate.daysAmount >= 1) {
+            for(uint256 i = 0; i < settings.dailyRate.daysAmount; i++) {
+                dailyAmountsForPeriod = dailyAmountsForPeriod.add(users[from].dailyAmounts[currentBeginOfTheDay.sub(i.mul(86400))]);
+            }
         }
+        
+
+        if (balanceOfFrom >= value) {
+            uint256 rest = balanceOfFrom.sub(value);
+            
+            if (
+                (
+                    sumGradual <= rest
+                ) &&
+                (
+                    (settings.dailyRate.exists == true && dailyAmountsForPeriod <= settings.dailyRate.amount ) 
+                    ||
+                    (settings.dailyRate.exists == false)
+                ) &&
+                (
+                    (isWhitelisted(to)) 
+                    ||
+                    (sumMinimum <= rest)
+                ) 
+            ) {
+                  return true;
+              }
+        }
+       
         return false;
     }
     
     
 
     /**
-    * @dev get sum minimum from address for period from now to timestamp.
+    * @dev get sum minimum and sum gradual minimums from address for period from now to timestamp.
     *
     * @param addr address.
     */
@@ -345,29 +407,35 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     ) 
         internal 
         view
-        returns (uint256 ret) 
+        returns (uint256 retMinimum,uint256 retGradual) 
     {
-        ret = 0;
+        retMinimum = 0;
+        retGradual = 0;
         
-        uint256 iMinimum = 0;
+        uint256 amount = 0;
         uint256 mapIndex = 0;
         
         for (uint256 i=0; i<users[addr].minimumsIndexes.length(); i++) {
             mapIndex = users[addr].minimumsIndexes.at(i);
-            iMinimum = users[addr].minimums[mapIndex].amount;
+            
             if (block.timestamp <= users[addr].minimums[mapIndex].timestampEnd) {
+                amount = users[addr].minimums[mapIndex].amount;
+                
                 if (users[addr].minimums[mapIndex].gradual == true) {
                     
-                        iMinimum = iMinimum.div(
+                        amount = amount.div(
                                         users[addr].minimums[mapIndex].timestampEnd.sub(users[addr].minimums[mapIndex].timestampStart)
                                         ).
                                      mul(
                                         users[addr].minimums[mapIndex].timestampEnd.sub(block.timestamp)
                                         );
-                       
+                                        
+                    //retGradual = (amount > retGradual) ? amount : retGradual;
+                    retGradual = retGradual.add(amount);
+                } else {
+                    retMinimum = retMinimum.add(amount);
                 }
                 
-                ret = ret.add(iMinimum);
             }
         }
         
@@ -496,14 +564,21 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         // calculate how much tokens we should transferMinimums without free tokens
         // here 
         //// value -- is how much tokens we would need to transfer
-        //// minimum -- how much tokens locks
+        //// minimumsNoneGradual -- how much tokens locks by none gradual minimums
         //// balanceFromBefore-minimum -- it's free tokens
-        //// value-(free tokens) -- how much tokens need to transferMinimums to destination address
+        //// amount-(value without free tokens) -- how much tokens need to transferMinimums to destination address
+        // for example 
+        // balance - 100. locked = 50; need to transfer 70
+        // here balanceFromBefore=100; 
+        //      minimumsNoneGradual=50; 
+        //      value=70;
+        //      amount is should be 20;
+        // and 20 tokens should be transfered with locked time(or reduced)
         
-        uint256 minimum = getMinimum(from);
-        if (balanceFromBefore.sub(minimum) < value) {
-            value = value.sub(balanceFromBefore.sub(minimum));    
-        }
+        (uint256 minimumsNoneGradual,uint256 gradualMinimums) = getMinimum(from);
+        
+        uint256 t = balanceFromBefore.sub(minimumsNoneGradual.max(gradualMinimums));
+        uint256 amount = (value >= t) ? value.sub(t) : value;
         
         // A -> B automaticLockup minimums added
         // A -> C automaticLockup minimums but reduce to 40
@@ -512,34 +587,55 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
 
         if (users[from].lockup.exists == true) {
             // then sender is A
-            
-            uint256 untilTimestamp = block.timestamp.add( 
-                (isWhitelisted(to)) 
-                ? 
-                    (
-                    settings.exists
-                    ?
-                    automaticLockupDuration.min(settings.reducePeriod) 
-                    :
+        
+            // _appendMinimum(
+            //     to,
+            //     untilTimestamp,
+            //     value, 
+            //     false   //bool gradual
+            // );
+            minimumsTransfer(
+                from, 
+                to, 
+                amount, 
+                false, 
+                (
+                    (isWhitelisted(to)) 
+                    ? 
+                        (
+                        settings.whitelist.exists
+                        ?
+                        automaticLockupDuration.min(settings.whitelist.reducePeriod) 
+                        :
+                        automaticLockupDuration
+                        )
+                    : 
                     automaticLockupDuration
-                    )
-                : 
-                automaticLockupDuration
-                );
-            
-            _appendMinimum(
-                to,
-                untilTimestamp,
-                value, 
-                false   //bool gradual
+                )
             );
             
             // C -> C transferLockups
         } else if (isWhitelisted(from) && isWhitelisted(to)) {
+            
+            
+            
+             //11111111111111111111
+            // Balance 60
+            // Lockup 50 for 11 months remaining
+            // Gradual minimum 48
+            // User can send 12 tokens to C or 10 tokens to B
+            //22222222222222222222
+            // Balance 60
+            // Lockup 30 for 11 months remaining
+            // Gradual minimum 48
+            // User can send 12 tokens to C or 12 tokens to B
+        
+        
+        
             minimumsTransfer(
                 from, 
                 to, 
-                value, 
+                amount, 
                 false, 
                 0
             );
@@ -550,23 +646,23 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
                 minimumsTransfer(
                     from, 
                     to, 
-                    value, 
+                    amount, 
                     true, 
-                    block.timestamp.add(settings.reducePeriod)
+                    settings.whitelist.reducePeriod
                 );
             }
-            
             // else available only free tokens to transfer and this was checked in autorize method before
         }
+
     }
-    
+  
     /**
      * 
      * @param from sender address
      * @param to destination address
      * @param value amount
      * @param reduceTimeDiff if true then all timestamp which more then minTimeDiff will reduce to minTimeDiff
-     * @param minTimeDiff minimum lockup timestamp time
+     * @param minTimeDiff minimum lockup period time or if reduceTimeDiff==false it is time to left tokens
      */
     function minimumsTransfer(
         address from, 
@@ -578,6 +674,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         internal
     {
         
+
         uint256 len = users[from].minimumsIndexes.length();
         uint256[] memory _dataList;
         uint256 recieverTimeLeft;
@@ -594,84 +691,61 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
             
             for (uint256 i=0; i<len; i++) {
                 
-                
-                if (value > users[from].minimums[_dataList[i]].amount) {
-                    //iValue = users[from].data[_dataList[i]].minimum;
-                    iValue = calculateAvailableMinimum(users[from].minimums[_dataList[i]]);
+                if (
+                    (users[from].minimums[_dataList[i]].gradual == false) &&
+                    (block.timestamp <= users[from].minimums[_dataList[i]].timestampEnd)
+                ) {
+
+                    if (value >= users[from].minimums[_dataList[i]].amount) {
+                        //iValue = users[from].data[_dataList[i]].minimum;
+                        iValue = users[from].minimums[_dataList[i]].amount;
+                        value = value.sub(iValue);
+                    } else {
+                        iValue = value;
+                        value = 0;
+                    }
+
+                    recieverTimeLeft = users[from].minimums[_dataList[i]].timestampEnd.sub(block.timestamp);
+                    // put to reciver
+                    _appendMinimum(
+                        to,
+                        block.timestamp.add((reduceTimeDiff ? minTimeDiff.min(recieverTimeLeft) : recieverTimeLeft)),
+                        iValue,
+                        false //users[from].data[_dataList[i]].gradual
+                    );
                     
-                    value = value.sub(iValue);
-                } else {
-                    iValue = value;
-                    value = 0;
-                }
-               
-                recieverTimeLeft = users[from].minimums[_dataList[i]].timestampEnd.sub(block.timestamp);
-                // put to reciver
-                _appendMinimum(
-                    to,
-                    block.timestamp.add((reduceTimeDiff ? minTimeDiff.min(recieverTimeLeft) : recieverTimeLeft)),
-                    iValue,
-                    false //users[from].data[_dataList[i]].gradual
-                );
+                    // remove from sender
+                    _reduceMinimum(
+                        from,
+                        users[from].minimums[_dataList[i]].timestampEnd,
+                        iValue
+                    );
+                      
+                    if (value == 0) {
+                        break;
+                    }
                 
-                // remove from sender
-                _reduceMinimum(
-                    from,
-                    users[from].minimums[_dataList[i]].timestampEnd,
-                    iValue
-                );
-                  
-                if (value == 0) {
-                    break;
                 }
             } // end for
             
-            
-            
-            //!!!!!  value can not be left more then zero  if then minimums are gone
-            // if (value != 0) {
-                
-            //     
-            //     _appendMinimum(
-            //         to,
-            //         block.timestamp.add(durationLockupNoneUSAPerson),
-            //         value,
-            //         false
-            //     );
-            // }
-            
+   
         }
+        
+        if (value != 0) {
+            
+            
+            _appendMinimum(
+                to,
+                block.timestamp.add(minTimeDiff),
+                value,
+                false
+            );
+        }
+     
         
     }
     
-    /**
-     * @dev calculating limit funds for the moment 
-     * if gradual option set to true then gradually 
-     */
-    function calculateAvailableMinimum(
-        Minimum memory mininumStruct
-    )
-        internal
-        view
-        returns(uint256 ret)
-    {
-        if (mininumStruct.gradual == true) {
-            if (block.timestamp >= mininumStruct.timestampEnd) {
-                ret = (mininumStruct.amount).div(
-                                        mininumStruct.timestampEnd.sub(mininumStruct.timestampStart)
-                                        ).
-                                     mul(
-                                        mininumStruct.timestampEnd.sub(block.timestamp)
-                                        );
-            } else {
-                ret = 0;
-            }
-                       
-        } else {
-            ret = mininumStruct.amount;
-        }
-    }
-    
+   
     //---------------------------------------------------------------------------------
     // external section
     //---------------------------------------------------------------------------------
@@ -715,6 +789,9 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         uint256 balanceFromBefore = ISRC20(_src20).balanceOf(from);
         require(ISRC20(_src20).executeTransfer(from, to, value), "SRC20 transfer failed");
         applyRuleLockup(from, to, value, balanceFromBefore);
+        
+        // store to daily amounts
+        users[from].dailyAmounts[beginOfTheCurrentDay()] = users[from].dailyAmounts[beginOfTheCurrentDay()].add(value);
         return true;
     }
     
@@ -749,5 +826,8 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
             quickSortAsc(arr, i, right);
     }
 
+    function beginOfTheCurrentDay() private view returns(uint256) {
+        return (block.timestamp.div(86400).mul(86400));
+    }
 	
 }

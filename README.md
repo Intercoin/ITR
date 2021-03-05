@@ -68,6 +68,12 @@ once installed will be use methods:
 		<td>whenever anyone on whitelist receives tokens their lockup time reduce</td>
 	</tr>
 	<tr>
+		<td><a href="#dailyrate">dailyRate</a></td>
+		<td>owner</td>
+		<td>whenever anyone on whitelist receives tokens their lockup time reduce</td>
+	</tr>
+	
+	<tr>
 		<td><a href="#whitelistadd">whitelistAdd</a></td>
 		<td>managers</td>
 		<td>adding persons to whitelist</td>
@@ -193,7 +199,16 @@ whenever anyone on whitelist receives tokens their lockup time reduce to daysAmo
 Params:
 name  | type | description
 --|--|--
-from|address| `from` address
+daysAmount|uint256|duration in days
+        
+### dailyRate
+
+setup limit sell amount of their tokens per daysAmount 
+
+Params:
+name  | type | description
+--|--|--
+amount|uint256| amount 
 daysAmount|uint256|duration in days
         
 ## Lifecycle

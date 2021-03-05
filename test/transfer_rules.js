@@ -67,7 +67,7 @@ contract('TransferRules', (accounts) => {
             "wrong balance for 2nd account "+message
         )
     }
-/* */
+
     it('create and initialize', async () => {
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         helperCostEth.transactionPush(TransferRulesInstance, 'TransferRulesInstance::new');
@@ -178,7 +178,7 @@ contract('TransferRules', (accounts) => {
         assert.equal(tmpBool, tmpBool2, 'adding person to whitelist if already exist, went wrong');
         
     });
-        
+    
     it('should no restrictions after deploy', async () => {
         var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
@@ -220,6 +220,7 @@ contract('TransferRules', (accounts) => {
                 // except from itself to itself
                 if (arr[i] != arr[j]) {
                     tmpCounter++;
+
                     await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, arr[i], arr[j], BigNumber(10*1e18), "Iteration#"+tmpCounter+" (sendTo)");
                     await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, arr[j], arr[i], BigNumber(40*1e18), "Iteration#"+tmpCounter+" (sendBack)");
                 }
@@ -290,6 +291,7 @@ contract('TransferRules', (accounts) => {
         assert.equal(tmp[0].toString(),(BigNumber(1).times(BigNumber(86400))).toString(), 'duration lockup was set wrong');
         assert.equal(tmp[1],true, 'duration lockup was set wrong');
         
+       
         // send to accountFourth
         await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(500*1e18), "Iteration#3");
         // try to send 500 ITR tokens from accountFourth to accountFive
@@ -373,14 +375,14 @@ contract('TransferRules', (accounts) => {
         await ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree});
         
         t = await TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
-        assert.equal(t.toString(), BigNumber(0).toString(), ' minimums are not equal zero for accountFourth');
+        assert.equal(t[0].toString(), BigNumber(0).toString(), ' minimums are not equal zero for accountFourth');
+        assert.equal(t[1].toString(), BigNumber(0).toString(), ' minimums(gradual) are not equal zero for accountFourth');
         
         t = await ExternalItrImitationMockInstance.balanceOf(accountFourth, {from: accountFourth});
         assert.equal(BigNumber(t).toString(), BigNumber(1000*1e18).toString(), 'Balance for accountFourth are wrong');
             
     });
   
-    
     it('testing minimums', async () => {
         let latestBlockInfo;
         
@@ -428,43 +430,62 @@ contract('TransferRules', (accounts) => {
         await ExternalItrImitationMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne});
         
     });
-      
 
+    it('test dailyRate', async () => {
+        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        await TransferRulesInstance.init({from: accountTen});
+        
+        // _updateRestrictionsAndRules     
+        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        
+        //------- #1
+        //mint accountOne 500ITR
+        await ExternalItrImitationMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
+        
+        
+        await truffleAssert.reverts(
+            TransferRulesInstance.dailyRate(BigNumber(500*1e18), 1, {from: accountFive}), 
+            "Ownable: caller is not the owner"
+        );
+        
+        await TransferRulesInstance.dailyRate(BigNumber(100*1e18), 1, {from: accountTen});
+        
+        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1");
+        /*
+        await truffleAssert.reverts(
+            sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1"), 
+            "transferToken restrictions failed"  // note that it's error message from ITR token contract
+        );
+        
+        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#2"), 
+        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#3"), 
+        
+        await truffleAssert.reverts(
+            sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#4"), 
+            "transferToken restrictions failed"  // note that it's error message from ITR token contract
+        );
+        
+        // pass 1 days
+        await helper.advanceTimeAndBlock(1*duration1Day);
+        
+        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#2"); 
+        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#3"); 
+        
+        await truffleAssert.reverts(
+            sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#4"), 
+            "transferToken restrictions failed"  // note that it's error message from ITR token contract
+        );
+*/
+    });
+    
     it('summary transactions cost', async () => {
         
-        // 
+        //
         // console.table(await helperCostEth.getTransactionsCostEth(90, false));
         console.table(await helperCostEth.getTransactionsCostEth(90, true));
         
     });
-        
-    /*
-    
-            
-// console.log(1*duration1Day);
-        
-// console.log('=====accountFourth=====');
-// t = await TransferRulesInstance.getMinimumsList(accountFourth, {from: accountTen});
-// console.log(t[0].toString(),t[1].toString());
 
-
-// t = await TransferRulesInstance.authorize(accountFourth, accountFive, BigNumber(500*1e18), {from: accountFourth});
-// console.log(tmpBool);
-
-// t = await TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
-// console.log(t.toString());
-    
-    
-    it('check minimums set by owner', async () => {
-        let latestBlockInfo;
-        
-        var TransferRulesInstance = await TransferRules.new({from: accountTen});
-        await TransferRulesInstance.init(durationLockupUSAPerson, durationLockupNoneUSAPerson, {from: accountTen});
-        
-        latestBlockInfo = await web3.eth.getBlock("latest");
-        await TransferRulesInstance.addMinimum(accountOne, BigNumber(700*1e18), latestBlockInfo.timestamp+1000, false, {from: accountTen});
-        
-    });
-    */
    
 });
