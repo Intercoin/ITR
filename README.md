@@ -70,7 +70,7 @@ once installed will be use methods:
 	<tr>
 		<td><a href="#dailyrate">dailyRate</a></td>
 		<td>owner</td>
-		<td>whenever anyone on whitelist receives tokens their lockup time reduce</td>
+		<td>setup limit sell `amount` of their tokens per `daysAmount`</td>
 	</tr>
 	<tr>
 		<td><a href="#whitelistadd">whitelistAdd</a></td>
