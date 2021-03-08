@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 
-import "./interfaces/ISRC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC777/IERC777Upgradeable.sol";
 import "./interfaces/ITransferRules.sol";
 import "./Whitelist.sol";
 import "./IntercoinTrait.sol";
@@ -20,7 +20,7 @@ import "./IntercoinTrait.sol";
  */
 contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whitelist, IntercoinTrait {
 
-	ISRC20 public _src20;
+	IERC777Upgradeable public _erc777;
 	using SafeMathUpgradeable for uint256;
 	using MathUpgradeable for uint256;
 	using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
@@ -68,8 +68,8 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     uint256 internal dayInSeconds;
     string  internal managersGroupName;
     
-    modifier onlySRC20 {
-        require(msg.sender == address(_src20));
+    modifier onlyERC777 {
+        require(msg.sender == address(_erc777));
         _;
     }
     
@@ -89,14 +89,14 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     }
     
     /**
-    * @dev clean SRC20. available only for owner
+    * @dev clean ERC777. available only for owner
     */
-    function cleanSRC(
+    function cleanERC(
     ) 
         public
         onlyOwner()
     {
-        _src20 = ISRC20(address(0));
+        _erc777 = IERC777Upgradeable(address(0));
     }
     
     
@@ -177,7 +177,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         view
         returns (bool) 
     {
-        uint256 balanceOfFrom = ISRC20(_src20).balanceOf(from);
+        uint256 balanceOfFrom = IERC777Upgradeable(_erc777).balanceOf(from);
         return _authorize(from, to, value, balanceOfFrom);
     }
     
@@ -299,8 +299,8 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     
     /**
      * setup limit sell amount of their tokens per daysAmount 
-     * @param amount
-     * @param daysAmount
+     * @param amount token's amount
+     * @param daysAmount days
      */
     function dailyRate(
         uint256 amount,
@@ -391,6 +391,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
                   return true;
               }
         }
+        
        
         return false;
     }
@@ -540,14 +541,13 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
      * @param value amount
      * @param balanceFromBefore balances sender's address before executeTransfer
      */
-    function applyRuleLockup(
+    function _applyRuleLockup(
         address from, 
         address to, 
         uint256 value,
         uint256 balanceFromBefore
     ) 
-        internal
-        onlySRC20
+        private
     {
         
         // check available balance for make transaction. in _authorize have already check whitelist(to) and available tokens 
@@ -753,17 +753,17 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     /**
     * @dev Set for what contract this rules are.
     *
-    * @param src20 - Address of SRC20 contract.
+    * @param erc777 - Address of ERC777 contract.
     */
-    function setSRC(
-        address src20
+    function setERC(
+        address erc777
     ) 
         override 
         external 
         returns (bool) 
     {
-        require(address(_src20) == address(0), "SRC20 already set");
-        _src20 = ISRC20(src20);
+        require(address(_erc777) == address(0), "external contract already set");
+        _erc777 = IERC777Upgradeable(erc777);
         return true;
     }
 
@@ -776,20 +776,19 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     * @param to The address to send tokens to.
     * @param value The amount of tokens to send.
     */
-    function doTransfer(
+    function applyRuleLockup(
         address from, 
         address to, 
         uint256 value
     ) 
         override 
         external 
-        onlySRC20 
+        onlyERC777 
         returns (bool) 
     {
-        uint256 balanceFromBefore = ISRC20(_src20).balanceOf(from);
-        require(ISRC20(_src20).executeTransfer(from, to, value), "SRC20 transfer failed");
-        applyRuleLockup(from, to, value, balanceFromBefore);
+        uint256 balanceFromBefore = IERC777Upgradeable(_erc777).balanceOf(from);
         
+        _applyRuleLockup(from, to, value, balanceFromBefore);
         // store to daily amounts
         users[from].dailyAmounts[beginOfTheCurrentDay()] = users[from].dailyAmounts[beginOfTheCurrentDay()].add(value);
         return true;

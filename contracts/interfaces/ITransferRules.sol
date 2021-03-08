@@ -7,9 +7,9 @@ pragma solidity >=0.6.0 <0.8.0;
  * same interface, managing multiply transfer rule implementations with
  * capabilities of managing what happens with tokens.
  *
- * This interface is working with ERC20 transfer() function
+ * This interface is working with ERC777 transfer() function
  */
 interface ITransferRules {
-    function setSRC(address src20) external returns (bool);
-    function doTransfer(address from, address to, uint256 value) external returns (bool);
+    function setERC(address erc777) external returns (bool);
+    function applyRuleLockup(address from, address to, uint256 value) external returns (bool);
 }

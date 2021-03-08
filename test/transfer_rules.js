@@ -2,13 +2,17 @@ const BigNumber = require('bignumber.js');
 const util = require('util');
 
 const TransferRulesMock = artifacts.require("TransferRulesMock");
-const ExternalItrImitationMock = artifacts.require("ExternalItrImitationMock");
+//const ExternalItrImitationMock = artifacts.require("ExternalItrImitationMock");
+const TradedTokenContractMock = artifacts.require("TradedTokenContractMock");
 
 
 const truffleAssert = require('truffle-assertions');
 const helper = require("../helpers/truffleTestHelper");
 
 const helperCostEth = require("../helpers/transactionsCost");
+
+require('@openzeppelin/test-helpers/configure')({ web3 });
+const { singletons } = require('@openzeppelin/test-helpers');
 
 
 contract('TransferRules', (accounts) => {
@@ -35,10 +39,15 @@ contract('TransferRules', (accounts) => {
     
     const zeroAddr = '0x0000000000000000000000000000000000000000';
     const version = '0.1';
-    const name = 'SomeContractName';
+    const name = 'ITR Token TEST';
+    const symbol = 'ITRT';
+    const defaultOperators = [];
+    
     const duration1Day = 86_400;       // 1 year
     const durationLockupUSAPerson = 31_536_000;       // 1 year
     const durationLockupNoneUSAPerson = 3_456_000;    // 40 days
+    
+    var erc1820;
     
     
     // temp vars used at compare status and variables
@@ -67,6 +76,12 @@ contract('TransferRules', (accounts) => {
             "wrong balance for 2nd account "+message
         )
     }
+    
+    
+    beforeEach(async() =>{
+        erc1820= await singletons.ERC1820Registry(accountNine);
+
+    });
 
     it('create and initialize', async () => {
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
@@ -74,26 +89,26 @@ contract('TransferRules', (accounts) => {
         trTmp = await TransferRulesInstance.init({from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::init');
     });
-    
+  
     it('setSRC test', async () => {
-        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+        var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
+        await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
+        //---
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        // await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, zeroAddr, {from: accountTen});
-        trTmp = await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        trTmp = await TradedTokenContractMockInstance._updateRestrictionsAndRules(zeroAddr, {from: accountTen});
         helperCostEth.transactionPush(trTmp, '_updateRestrictionsAndRules');
         
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, zeroAddr, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen}),
-            'SRC20 already set'
+            TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen}),
+            'external contract already set'
         );
         
     });
-   
+ 
     it('owner can manage role `managers`', async () => {
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
@@ -178,14 +193,16 @@ contract('TransferRules', (accounts) => {
         assert.equal(tmpBool, tmpBool2, 'adding person to whitelist if already exist, went wrong');
         
     });
-    
+   
     it('should no restrictions after deploy', async () => {
-        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+    
+        var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(zeroAddr, {from: accountTen});
         
         // create managers
         await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
@@ -200,9 +217,9 @@ contract('TransferRules', (accounts) => {
         // mint to all accounts 1000 ITR
         // and to itself(owner) too
         for(var i=0; i<arr.length; i++) {
-            await ExternalItrImitationMockInstance.mint(arr[i], BigNumber(1000*1e18), {from: accountTen});
+            await TradedTokenContractMockInstance.mint(arr[i], BigNumber(1000*1e18), {from: accountTen});
             // check Balance
-            tmpBalance = await ExternalItrImitationMockInstance.balanceOf(arr[i]);
+            tmpBalance = await TradedTokenContractMockInstance.balanceOf(arr[i]);
             assert.equal(
                 (BigNumber(1000*1e18)).toString(),
                 (BigNumber(tmpBalance)).toString(),
@@ -221,8 +238,8 @@ contract('TransferRules', (accounts) => {
                 if (arr[i] != arr[j]) {
                     tmpCounter++;
 
-                    await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, arr[i], arr[j], BigNumber(10*1e18), "Iteration#"+tmpCounter+" (sendTo)");
-                    await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, arr[j], arr[i], BigNumber(40*1e18), "Iteration#"+tmpCounter+" (sendBack)");
+                    await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, arr[i], arr[j], BigNumber(10*1e18), "Iteration#"+tmpCounter+" (sendTo)");
+                    await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, arr[j], arr[i], BigNumber(40*1e18), "Iteration#"+tmpCounter+" (sendBack)");
                 }
             }
         }
@@ -270,19 +287,20 @@ contract('TransferRules', (accounts) => {
     });
 
     it('testing automaticLockup', async () => {
-        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+        var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
         
         //mint accountOne 1000ITR
-        await ExternalItrImitationMockInstance.mint(accountOne, BigNumber(1500*1e18), {from: accountTen});
+        await TradedTokenContractMockInstance.mint(accountOne, BigNumber(1500*1e18), {from: accountTen});
         
         // be sure that accountOne can send to someone without lockup limit
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountTwo, BigNumber(500*1e18), "Iteration#1");
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountTwo, accountThree, BigNumber(500*1e18), "Iteration#2");
+        await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountTwo, BigNumber(500*1e18), "Iteration#1");
+        await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountTwo, accountThree, BigNumber(500*1e18), "Iteration#2");
         
         // setup automatic lockup for accountOne for 1 day
         await TransferRulesInstance.automaticLockupAdd(accountOne, 1, {from: accountTen});
@@ -293,13 +311,13 @@ contract('TransferRules', (accounts) => {
         
        
         // send to accountFourth
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(500*1e18), "Iteration#3");
+        await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(500*1e18), "Iteration#3");
         // try to send 500 ITR tokens from accountFourth to accountFive
         // expecting that tokens will be lock for accountFourth for 1 day
 
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance.transfer(accountFive, BigNumber(500*1e18), {from: accountFourth}), 
-            "transferToken restrictions failed"  // note that it's error message from ITR token contract
+            TradedTokenContractMockInstance.transfer(accountFive, BigNumber(500*1e18), {from: accountFourth}), 
+            "Transfer not authorized"
         );
         
         tmpBool = await TransferRulesInstance.authorize(accountFourth, accountFive, BigNumber(500*1e18), {from: accountFourth});
@@ -311,26 +329,27 @@ contract('TransferRules', (accounts) => {
 
         
         // and try again
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountFourth, accountFive, BigNumber(500*1e18), "Iteration#4");
+        await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountFourth, accountFive, BigNumber(500*1e18), "Iteration#4");
         
         
         ///// 
         // remove automaticLockup from accountOne
         await TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountTen});
         // send to accountFourth another 500 ITR
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(500*1e18), "Iteration#5");
+        await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(500*1e18), "Iteration#5");
         // expecting that the tokens doesnot locked up and transfered w/out reverts
-        await ExternalItrImitationMockInstance.transfer(accountFive, BigNumber(500*1e18), {from: accountFourth});
+        await TradedTokenContractMockInstance.transfer(accountFive, BigNumber(500*1e18), {from: accountFourth});
         
     });
  
     it('whitelistReduce should reduce locked time for whitelist persons', async () => {
-        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+        var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
         
         // owner adding manager 
         await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
@@ -340,45 +359,45 @@ contract('TransferRules', (accounts) => {
         // setup 4 days locked up for manager
         await TransferRulesInstance.automaticLockupAdd(accountOne, 4, {from: accountTen});
         // mint 1500 ITR to manager
-        await ExternalItrImitationMockInstance.mint(accountOne, BigNumber(1500*1e18), {from: accountTen});
+        await TradedTokenContractMockInstance.mint(accountOne, BigNumber(1500*1e18), {from: accountTen});
         // setup whitelistReduce value into 1 day
         await TransferRulesInstance.whitelistReduce(1, {from: accountTen});
         
         // transfer 500ITR to whitelist person
-        await ExternalItrImitationMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne})
+        await TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne})
         // transfer 500ITR to none-whitelist person
-        await ExternalItrImitationMockInstance.transfer(accountThree, BigNumber(500*1e18), {from: accountOne})
+        await TradedTokenContractMockInstance.transfer(accountThree, BigNumber(500*1e18), {from: accountOne})
 
         // revert all: none-whitelist and whitelist person
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountTwo}), 
-            "transferToken restrictions failed"
+            TradedTokenContractMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountTwo}), 
+            "Transfer not authorized"
         );
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree}), 
-            "transferToken restrictions failed"
+            TradedTokenContractMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree}), 
+            "Transfer not authorized"
         );
         
         // pass 1 days
         await helper.advanceTimeAndBlock(1*duration1Day);
         
         // revert for none-whitelist person only
-        await ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountTwo});
+        await TradedTokenContractMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountTwo});
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree}), 
-            "transferToken restrictions failed"
+            TradedTokenContractMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree}), 
+            "Transfer not authorized"
         );
         
         // pass 3 days
         await helper.advanceTimeAndBlock(3*duration1Day);
         // in total passed 4 days  so tokens will be available for none-whitelist person
-        await ExternalItrImitationMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree});
+        await TradedTokenContractMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree});
         
         t = await TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
         assert.equal(t[0].toString(), BigNumber(0).toString(), ' minimums are not equal zero for accountFourth');
         assert.equal(t[1].toString(), BigNumber(0).toString(), ' minimums(gradual) are not equal zero for accountFourth');
         
-        t = await ExternalItrImitationMockInstance.balanceOf(accountFourth, {from: accountFourth});
+        t = await TradedTokenContractMockInstance.balanceOf(accountFourth, {from: accountFourth});
         assert.equal(BigNumber(t).toString(), BigNumber(1000*1e18).toString(), 'Balance for accountFourth are wrong');
             
     });
@@ -386,62 +405,65 @@ contract('TransferRules', (accounts) => {
     it('testing minimums', async () => {
         let latestBlockInfo;
         
-        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+        var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
         
         //------- #1
         //mint accountOne 500ITR
-        await ExternalItrImitationMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
+        await TradedTokenContractMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
         
         latestBlockInfo = await web3.eth.getBlock("latest");
         
         await TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
         
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne}), 
-            "transferToken restrictions failed"
+            TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne}), 
+            "Transfer not authorized"
         );
         
         // pass 1 days
         await helper.advanceTimeAndBlock(1*duration1Day);
         // try again
-        await ExternalItrImitationMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne});
+        await TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne});
     
         //------- #2
         //mint accountOne 500ITR
-        await ExternalItrImitationMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
+        await TradedTokenContractMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
         
         latestBlockInfo = await web3.eth.getBlock("latest");
         
         await TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
         
         await truffleAssert.reverts(
-            ExternalItrImitationMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne}), 
-            "transferToken restrictions failed"
+            TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne}), 
+            "Transfer not authorized"
         );
         // remove minimums
         await TransferRulesInstance.minimumsClear(accountOne, {from: accountTen});
         
         // try again (so without passing 1 day)
-        await ExternalItrImitationMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne});
+        await TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne});
         
     });
+    
 
     it('test dailyRate', async () => {
-        var ExternalItrImitationMockInstance = await ExternalItrImitationMock.new({from: accountTen});
+        var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await ExternalItrImitationMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
         
         //------- #1
         //mint accountOne 500ITR
-        await ExternalItrImitationMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
+        await TradedTokenContractMockInstance.mint(accountOne, BigNumber(500*1e18), {from: accountTen});
         
         
         await truffleAssert.reverts(
@@ -451,39 +473,39 @@ contract('TransferRules', (accounts) => {
         
         await TransferRulesInstance.dailyRate(BigNumber(100*1e18), 1, {from: accountTen});
         
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1");
-        /*
-        await truffleAssert.reverts(
-            sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1"), 
-            "transferToken restrictions failed"  // note that it's error message from ITR token contract
-        );
+        await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1");
         
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#2"), 
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#3"), 
+        // await truffleAssert.reverts(
+        //     sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1"), 
+        //     "Transfer not authorized"
+        // );
         
-        await truffleAssert.reverts(
-            sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#4"), 
-            "transferToken restrictions failed"  // note that it's error message from ITR token contract
-        );
+        // await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#2"), 
+        // await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#3"), 
         
-        // pass 1 days
-        await helper.advanceTimeAndBlock(1*duration1Day);
+        // await truffleAssert.reverts(
+        //     sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#4"), 
+        //     "Transfer not authorized"
+        // );
         
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#2"); 
-        await sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#3"); 
+        // // pass 1 days
+        // await helper.advanceTimeAndBlock(1*duration1Day);
         
-        await truffleAssert.reverts(
-            sendAndCheckCorrectBalance(ExternalItrImitationMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#4"), 
-            "transferToken restrictions failed"  // note that it's error message from ITR token contract
-        );
-*/
+        // await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#2"); 
+        // await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#3"); 
+        
+        // await truffleAssert.reverts(
+        //     sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(50*1e18), "Iteration#4"), 
+        //     "Transfer not authorized"
+        // );
+
     });
-    
+
     it('summary transactions cost', async () => {
         
         //
-        // console.table(await helperCostEth.getTransactionsCostEth(90, false));
-        console.table(await helperCostEth.getTransactionsCostEth(90, true));
+        console.table(await helperCostEth.getTransactionsCostEth(90, false));
+        //console.table(await helperCostEth.getTransactionsCostEth(90, true));
         
     });
 

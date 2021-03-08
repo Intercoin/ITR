@@ -38,9 +38,9 @@ once installed will be use methods:
 		<td>removing automatic lockup for person</td>
 	</tr>
   <tr>
-		<td><a href="#cleansrc">cleanSRC</a></td>
+		<td><a href="#cleanerc">cleanERC</a></td>
 		<td>owner</td>
-		<td>possible to owner clean src20 address and re-update settings in ITR tokens</td>
+		<td>possible to owner clean erc777 address and re-update settings in ITR tokens</td>
 	</tr>
 	<tr>
 		<td><a href="#minimumsadd">minimumsAdd</a></td>
@@ -91,9 +91,9 @@ once installed will be use methods:
 
 init method
     
-### cleanSRC
+### cleanERC
 
-clean SRC20. available only for owner
+clean ERC777. available only for owner
       
 ### minimumsView
 
@@ -211,19 +211,14 @@ amount|uint256| amount
 daysAmount|uint256|duration in days
         
 ## Lifecycle
-This contract is part of ITR token and realize two interfaces: ITransferRules and ITransferRestrictions
+This contract is part of ITR token and realize interface: ITransferRules
 ```
 interface ITransferRules {
-    function setSRC(address src20) external returns (bool);
-    function doTransfer(address from, address to, uint256 value) external returns (bool);
+    function setERC(address erc777) external returns (bool);
+    function applyRuleLockup(address from, address to, uint256 value) external returns (bool);
 }
 ```
 
-```
-interface ITransferRestrictions {
-    function authorize(address from, address to, uint256 value) external returns (bool);
-}
-```
-So ITR token contract should call `setSRC(address src20)` externally, where src20 - is address of ITR contract.
-Then before instead own transfer should call `doTransfer(address from, address to, uint256 value)` externally.
-TransferRules will call executeTransfer method if it passed own internal validations
+So ITR token contract should call `setERC(address erc777)` externally, where erc777 - is address of ITR contract.
+Then before instead own transfer( in _beforeTokenTransfer) should call `applyRuleLockup(address from, address to, uint256 value)` externally.
+TransferRules will revert transaction if it cannot pass own internal validators
