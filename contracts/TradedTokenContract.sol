@@ -22,13 +22,13 @@ contract TradedTokenContract is ERC777Upgradeable, OwnableUpgradeable {
     function initialize(string memory name, string memory symbol, address[] memory defaultOperators) public virtual initializer {
         __Ownable_init();
         __ERC777_init(name, symbol, defaultOperators);
-
+        _mint(owner(), 1_000_000_000 * 10 ** 18, "", "");
     }
     
     function _beforeTokenTransfer(address operator, address from, address to, uint256 amount) internal override { 
         if (_rules != ITransferRules(0)) {
             
-            if (from != address(0) || to != address(0)) {
+            if (from != address(0) && to != address(0)) {
                 require(_rules.applyRuleLockup(from, to, amount), "Transfer failed");
             }
         }

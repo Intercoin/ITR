@@ -51,7 +51,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     }
     
     struct DailyRate {
-        uint256 amount;
+        uint256 amount;   // minimum sum limit for last days
         uint256 daysAmount;
         bool exists;
     }
@@ -299,6 +299,7 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
     
     /**
      * setup limit sell amount of their tokens per daysAmount 
+     * if days more than 1 then calculate sum amount for last days
      * @param amount token's amount
      * @param daysAmount days
      */
@@ -359,13 +360,13 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
         returns (bool) 
     {
 
-        (uint256 sumMinimum, uint256 sumGradual) = getMinimum(from);
+        (uint256 sumRegularMinimum, uint256 sumGradualMinimum) = getMinimum(from);
 
-        uint256 dailyAmountsForPeriod = 0;
+        uint256 sumAmountsForPeriod = 0;
         uint256 currentBeginOfTheDay = beginOfTheCurrentDay();
         if (settings.dailyRate.exists == true && settings.dailyRate.daysAmount >= 1) {
             for(uint256 i = 0; i < settings.dailyRate.daysAmount; i++) {
-                dailyAmountsForPeriod = dailyAmountsForPeriod.add(users[from].dailyAmounts[currentBeginOfTheDay.sub(i.mul(86400))]);
+                sumAmountsForPeriod = sumAmountsForPeriod.add(users[from].dailyAmounts[currentBeginOfTheDay.sub(i.mul(86400))]);
             }
         }
         
@@ -375,17 +376,17 @@ contract TransferRules is Initializable, OwnableUpgradeable, ITransferRules, Whi
             
             if (
                 (
-                    sumGradual <= rest
+                    sumGradualMinimum <= rest
                 ) &&
                 (
-                    (settings.dailyRate.exists == true && dailyAmountsForPeriod <= settings.dailyRate.amount ) 
+                    (settings.dailyRate.exists == true && sumAmountsForPeriod <= settings.dailyRate.amount ) 
                     ||
                     (settings.dailyRate.exists == false)
                 ) &&
                 (
                     (isWhitelisted(to)) 
                     ||
-                    (sumMinimum <= rest)
+                    (sumRegularMinimum <= rest)
                 ) 
             ) {
                   return true;

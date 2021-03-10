@@ -90,7 +90,7 @@ contract('TransferRules', (accounts) => {
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::init');
     });
   
-    it('setSRC test', async () => {
+    it('setERC test', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
         await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         //---
@@ -197,7 +197,7 @@ contract('TransferRules', (accounts) => {
     it('should no restrictions after deploy', async () => {
     
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
-		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
@@ -213,7 +213,7 @@ contract('TransferRules', (accounts) => {
         await TransferRulesInstance.whitelistAdd([accountFourth], {from: accountTwo});
         
         
-        let arr = [accountOne,accountTwo,accountThree,accountFourth,accountTen];
+        let arr = [accountOne,accountTwo,accountThree,accountFourth];
         // mint to all accounts 1000 ITR
         // and to itself(owner) too
         for(var i=0; i<arr.length; i++) {
@@ -288,7 +288,7 @@ contract('TransferRules', (accounts) => {
 
     it('testing automaticLockup', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
-		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
@@ -344,7 +344,7 @@ contract('TransferRules', (accounts) => {
  
     it('whitelistReduce should reduce locked time for whitelist persons', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
-		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
@@ -406,7 +406,7 @@ contract('TransferRules', (accounts) => {
         let latestBlockInfo;
         
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
-		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
@@ -454,7 +454,7 @@ contract('TransferRules', (accounts) => {
 
     it('test dailyRate', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
-		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators);
+		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
         await TransferRulesInstance.init({from: accountTen});
         
