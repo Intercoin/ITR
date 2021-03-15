@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/ITransferRules.sol";
 
 contract TradedTokenContract is ERC777Upgradeable, OwnableUpgradeable {
+    using SafeMathUpgradeable for uint256;
 
     /**
      * Configured contract implementing token rule(s).
@@ -23,6 +24,16 @@ contract TradedTokenContract is ERC777Upgradeable, OwnableUpgradeable {
         __Ownable_init();
         __ERC777_init(name, symbol, defaultOperators);
         _mint(owner(), 1_000_000_000 * 10 ** 18, "", "");
+    }
+    
+    /**
+     * @dev Creates `amount` tokens and send to account.
+     *
+     * See {ERC20-_mint}.
+     */
+    function mint(address account, uint256 amount) public onlyOwner virtual  {
+        require((totalSupply().add(amount) <= 1_000_000_000 * 10 ** 18), "Total supply exceed cap");
+        _mint(account, amount, bytes(''), bytes(''));
     }
     
     function _beforeTokenTransfer(address operator, address from, address to, uint256 amount) internal override { 
