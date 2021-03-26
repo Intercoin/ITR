@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0 <0.8.0;
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "./interfaces/IIntercoin.sol";
 import "./interfaces/IIntercoinTrait.sol";
 
-contract IntercoinTrait is Initializable, IIntercoinTrait {
+contract IntercoinTrait is IIntercoinTrait {
     
     address private intercoinAddr;
     bool private isSetup;

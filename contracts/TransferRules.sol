@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity >=0.7.0 <0.8.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC777/IERC777Upgradeable.sol";
 import "./interfaces/ITransferRules.sol";
 import "./Whitelist.sol";
 import "./IntercoinTrait.sol";
-
-
 
 /*
  * @title TransferRules contract

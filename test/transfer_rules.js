@@ -14,6 +14,7 @@ const helperCostEth = require("../helpers/transactionsCost");
 require('@openzeppelin/test-helpers/configure')({ web3 });
 const { singletons } = require('@openzeppelin/test-helpers');
 
+const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades');
 
 contract('TransferRules', (accounts) => {
     
@@ -77,119 +78,124 @@ contract('TransferRules', (accounts) => {
         )
     }
     
-    
+    var TransferRulesInstance;
     beforeEach(async() =>{
         erc1820= await singletons.ERC1820Registry(accountNine);
 
+        //TransferRulesInstance = await deployProxy(TransferRulesMock);
+        this.TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        await this.TransferRulesInstance.init({from: accountTen});
     });
 
     it('create and initialize', async () => {
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        helperCostEth.transactionPush(TransferRulesInstance, 'TransferRulesInstance::new');
-        trTmp = await TransferRulesInstance.init({from: accountTen});
-        helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::init');
+        //var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        helperCostEth.transactionPush(this.TransferRulesInstance, 'TransferRulesInstance::new');
+        
+        // trTmp = await this.TransferRulesInstance.init({from: accountTen});
+        // helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::init');
     });
-  
+      
     it('setERC test', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
         await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
         //---
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
         trTmp = await TradedTokenContractMockInstance._updateRestrictionsAndRules(zeroAddr, {from: accountTen});
         helperCostEth.transactionPush(trTmp, '_updateRestrictionsAndRules');
         
-        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(this.TransferRulesInstance.address, {from: accountTen});
         await truffleAssert.reverts(
-            TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen}),
+            TradedTokenContractMockInstance._updateRestrictionsAndRules(this.TransferRulesInstance.address, {from: accountTen}),
             'external contract already set'
         );
         
     });
  
     it('owner can manage role `managers`', async () => {
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         await truffleAssert.reverts(
-            TransferRulesInstance.managersAdd([accountOne], {from: accountFive}), 
+            this.TransferRulesInstance.managersAdd([accountOne], {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         await truffleAssert.reverts(
-            TransferRulesInstance.managersRemove([accountOne], {from: accountFive}), 
+            this.TransferRulesInstance.managersRemove([accountOne], {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         
-        let managersGroupName = await TransferRulesInstance.getManagersGroupName({from: accountTen});
+        let managersGroupName = await this.TransferRulesInstance.getManagersGroupName({from: accountTen});
         
-        trTmp = await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
+        trTmp = await this.TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::managersAdd');
-        tmpBool = await TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
+        tmpBool = await this.TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
         assert.equal(tmpBool, true, 'could not add manager');
         
-        trTmp = await TransferRulesInstance.managersRemove([accountOne], {from: accountTen});
+        trTmp = await this.TransferRulesInstance.managersRemove([accountOne], {from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::managersRemove');
-        tmpBool = await TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
+        tmpBool = await this.TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
         assert.equal(tmpBool, false, 'could not remove manager');
         
         
         // remove from list if none exist before
-        tmpBool = await TransferRulesInstance.isWhitelistedMock(managersGroupName, accountTwo, {from: accountTen});
-        await TransferRulesInstance.managersRemove([accountTwo], {from: accountTen});
-        tmpBool2 = await TransferRulesInstance.isWhitelistedMock(managersGroupName, accountTwo, {from: accountTen});
+        tmpBool = await this.TransferRulesInstance.isWhitelistedMock(managersGroupName, accountTwo, {from: accountTen});
+        await this.TransferRulesInstance.managersRemove([accountTwo], {from: accountTen});
+        tmpBool2 = await this.TransferRulesInstance.isWhitelistedMock(managersGroupName, accountTwo, {from: accountTen});
         assert.equal(tmpBool, tmpBool2, 'removing manager from list if none exist before went wrong');
         
         // add to list if already exist
-        await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
-        tmpBool = await TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
-        await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
-        tmpBool2 = await TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
+        await this.TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
+        tmpBool = await this.TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
+        await this.TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
+        tmpBool2 = await this.TransferRulesInstance.isWhitelistedMock(managersGroupName, accountOne, {from: accountTen});
         assert.equal(tmpBool, tmpBool2, 'adding manager list if already exist went wrong');
         
     });
-     
+ 
+    
     it('managers can add/remove person to whitelist', async () => {
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         await truffleAssert.reverts(
-            TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne}), 
+            this.TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne}), 
             "Sender is not in whitelist"
         );
         
         //owner can't add into whitelist if he will not add himself to managers list
         await truffleAssert.reverts(
-            TransferRulesInstance.whitelistAdd([accountTwo], {from: accountTen}), 
+            this.TransferRulesInstance.whitelistAdd([accountTwo], {from: accountTen}), 
             "Sender is not in whitelist"
         );
         
-        await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
+        await this.TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
         
-        tmpBool = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
-        trTmp = await TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
+        tmpBool = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        trTmp = await this.TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::whitelistAdd');
-        tmpBool2 = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        tmpBool2 = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
         assert.equal(((tmpBool != tmpBool2) && tmpBool2 == true), true, 'could add person to whitelist');
         
-        tmpBool = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
-        trTmp = await TransferRulesInstance.whitelistRemove([accountTwo], {from: accountOne});
+        tmpBool = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        trTmp = await this.TransferRulesInstance.whitelistRemove([accountTwo], {from: accountOne});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::whitelistRemove');
-        tmpBool2 = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        tmpBool2 = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
         assert.equal(((tmpBool != tmpBool2) && tmpBool2 == false), true, 'could add person to whitelist');
         //---------
         // remove from list if none exist before
-        tmpBool = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
-        await TransferRulesInstance.whitelistRemove([accountTwo], {from: accountOne});
-        tmpBool2 = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        tmpBool = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        await this.TransferRulesInstance.whitelistRemove([accountTwo], {from: accountOne});
+        tmpBool2 = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
         assert.equal(tmpBool, tmpBool2, 'removing person from list if none exist before, went wrong');
         
         // add to list if already exist
-        await TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
-        tmpBool = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
-        await TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
-        tmpBool2 = await TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        await this.TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
+        tmpBool = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
+        await this.TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
+        tmpBool2 = await this.TransferRulesInstance.isWhitelisted(accountTwo, {from: accountTen});
         assert.equal(tmpBool, tmpBool2, 'adding person to whitelist if already exist, went wrong');
         
     });
@@ -198,19 +204,19 @@ contract('TransferRules', (accounts) => {
     
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
 		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
         await TradedTokenContractMockInstance._updateRestrictionsAndRules(zeroAddr, {from: accountTen});
         
         // create managers
-        await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
-        await TransferRulesInstance.managersAdd([accountTwo], {from: accountTen});
+        await this.TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
+        await this.TransferRulesInstance.managersAdd([accountTwo], {from: accountTen});
         
         // create whitelist persons
-        await TransferRulesInstance.whitelistAdd([accountThree], {from: accountOne});
-        await TransferRulesInstance.whitelistAdd([accountFourth], {from: accountTwo});
+        await this.TransferRulesInstance.whitelistAdd([accountThree], {from: accountOne});
+        await this.TransferRulesInstance.whitelistAdd([accountFourth], {from: accountTwo});
         
         
         let arr = [accountOne,accountTwo,accountThree,accountFourth];
@@ -247,53 +253,53 @@ contract('TransferRules', (accounts) => {
     });
 
     it('automaticLockup should call only by owner', async () => {
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         await truffleAssert.reverts(
-            TransferRulesInstance.automaticLockupAdd(accountOne, 5, {from: accountFive}), 
+            this.TransferRulesInstance.automaticLockupAdd(accountOne, 5, {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         await truffleAssert.reverts(
-            TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountFive}), 
+            this.TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         
-        trTmp = await TransferRulesInstance.automaticLockupAdd(accountOne, 5, {from: accountTen});
+        trTmp = await this.TransferRulesInstance.automaticLockupAdd(accountOne, 5, {from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::automaticLockupAdd');
-        trTmp = await TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountTen});
+        trTmp = await this.TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::automaticLockupRemove');
     });
     
     it('minimums should call only by owner', async () => {
         let latestBlockInfo = await web3.eth.getBlock("latest");
         
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         await truffleAssert.reverts(
-            TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountFive}), 
+            this.TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         await truffleAssert.reverts(
-            TransferRulesInstance.minimumsClear(accountOne, {from: accountFive}), 
+            this.TransferRulesInstance.minimumsClear(accountOne, {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         
-        trTmp = await TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
+        trTmp = await this.TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::minimumsAdd');
-        trTmp = await TransferRulesInstance.minimumsClear(accountOne, {from: accountTen});
+        trTmp = await this.TransferRulesInstance.minimumsClear(accountOne, {from: accountTen});
         helperCostEth.transactionPush(trTmp, 'TransferRulesInstance::minimumsClear');
     });
 
     it('testing automaticLockup', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
 		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(this.TransferRulesInstance.address, {from: accountTen});
         
         //mint accountOne 1000ITR
         await TradedTokenContractMockInstance.mint(accountOne, BigNumber(1500*1e18), {from: accountTen});
@@ -303,9 +309,9 @@ contract('TransferRules', (accounts) => {
         await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountTwo, accountThree, BigNumber(500*1e18), "Iteration#2");
         
         // setup automatic lockup for accountOne for 1 day
-        await TransferRulesInstance.automaticLockupAdd(accountOne, 1, {from: accountTen});
+        await this.TransferRulesInstance.automaticLockupAdd(accountOne, 1, {from: accountTen});
         // check lockup exist
-        tmp = await TransferRulesInstance.getLockup(accountOne, {from: accountTen});
+        tmp = await this.TransferRulesInstance.getLockup(accountOne, {from: accountTen});
         assert.equal(tmp[0].toString(),(BigNumber(1).times(BigNumber(86400))).toString(), 'duration lockup was set wrong');
         assert.equal(tmp[1],true, 'duration lockup was set wrong');
         
@@ -320,7 +326,7 @@ contract('TransferRules', (accounts) => {
             "Transfer not authorized"
         );
         
-        tmpBool = await TransferRulesInstance.authorize(accountFourth, accountFive, BigNumber(500*1e18), {from: accountFourth});
+        tmpBool = await this.TransferRulesInstance.authorize(accountFourth, accountFive, BigNumber(500*1e18), {from: accountFourth});
         assert.equal(tmpBool, false, 'emsg `Transfer not authorized` does not emit');
         
       
@@ -334,7 +340,7 @@ contract('TransferRules', (accounts) => {
         
         ///// 
         // remove automaticLockup from accountOne
-        await TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountTen});
+        await this.TransferRulesInstance.automaticLockupRemove(accountOne, {from: accountTen});
         // send to accountFourth another 500 ITR
         await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(500*1e18), "Iteration#5");
         // expecting that the tokens doesnot locked up and transfered w/out reverts
@@ -345,23 +351,23 @@ contract('TransferRules', (accounts) => {
     it('whitelistReduce should reduce locked time for whitelist persons', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
 		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(this.TransferRulesInstance.address, {from: accountTen});
         
         // owner adding manager 
-        await TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
+        await this.TransferRulesInstance.managersAdd([accountOne], {from: accountTen});
         // manager adding person into whitelist
-        await TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
+        await this.TransferRulesInstance.whitelistAdd([accountTwo], {from: accountOne});
         
         // setup 4 days locked up for manager
-        await TransferRulesInstance.automaticLockupAdd(accountOne, 4, {from: accountTen});
+        await this.TransferRulesInstance.automaticLockupAdd(accountOne, 4, {from: accountTen});
         // mint 1500 ITR to manager
         await TradedTokenContractMockInstance.mint(accountOne, BigNumber(1500*1e18), {from: accountTen});
         // setup whitelistReduce value into 1 day
-        await TransferRulesInstance.whitelistReduce(1, {from: accountTen});
+        await this.TransferRulesInstance.whitelistReduce(1, {from: accountTen});
         
         // transfer 500ITR to whitelist person
         await TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne})
@@ -393,7 +399,7 @@ contract('TransferRules', (accounts) => {
         // in total passed 4 days  so tokens will be available for none-whitelist person
         await TradedTokenContractMockInstance.transfer(accountFourth, BigNumber(500*1e18), {from: accountThree});
         
-        t = await TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
+        t = await this.TransferRulesInstance.minimumsView(accountFourth, {from: accountFourth});
         assert.equal(t[0].toString(), BigNumber(0).toString(), ' minimums are not equal zero for accountFourth');
         assert.equal(t[1].toString(), BigNumber(0).toString(), ' minimums(gradual) are not equal zero for accountFourth');
         
@@ -407,11 +413,11 @@ contract('TransferRules', (accounts) => {
         
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
 		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(this.TransferRulesInstance.address, {from: accountTen});
         
         //------- #1
         //mint accountOne 500ITR
@@ -419,7 +425,7 @@ contract('TransferRules', (accounts) => {
         
         latestBlockInfo = await web3.eth.getBlock("latest");
         
-        await TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
+        await this.TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
         
         await truffleAssert.reverts(
             TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne}), 
@@ -437,14 +443,14 @@ contract('TransferRules', (accounts) => {
         
         latestBlockInfo = await web3.eth.getBlock("latest");
         
-        await TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
+        await this.TransferRulesInstance.minimumsAdd(accountOne, BigNumber(500*1e18), latestBlockInfo.timestamp + duration1Day, true, {from: accountTen});
         
         await truffleAssert.reverts(
             TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne}), 
             "Transfer not authorized"
         );
         // remove minimums
-        await TransferRulesInstance.minimumsClear(accountOne, {from: accountTen});
+        await this.TransferRulesInstance.minimumsClear(accountOne, {from: accountTen});
         
         // try again (so without passing 1 day)
         await TradedTokenContractMockInstance.transfer(accountTwo, BigNumber(500*1e18), {from: accountOne});
@@ -455,11 +461,11 @@ contract('TransferRules', (accounts) => {
     it('test dailyRate', async () => {
         var TradedTokenContractMockInstance = await TradedTokenContractMock.new({from: accountTen});
 		await TradedTokenContractMockInstance.initialize(name, symbol, defaultOperators, {from: accountTen});
-        var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
-        await TransferRulesInstance.init({from: accountTen});
+        // var TransferRulesInstance = await TransferRulesMock.new({from: accountTen});
+        // await TransferRulesInstance.init({from: accountTen});
         
         // _updateRestrictionsAndRules     
-        await TradedTokenContractMockInstance._updateRestrictionsAndRules(TransferRulesInstance.address, {from: accountTen});
+        await TradedTokenContractMockInstance._updateRestrictionsAndRules(this.TransferRulesInstance.address, {from: accountTen});
         
         //------- #1
         //mint accountOne 500ITR
@@ -467,11 +473,11 @@ contract('TransferRules', (accounts) => {
         
         
         await truffleAssert.reverts(
-            TransferRulesInstance.dailyRate(BigNumber(500*1e18), 1, {from: accountFive}), 
+            this.TransferRulesInstance.dailyRate(BigNumber(500*1e18), 1, {from: accountFive}), 
             "Ownable: caller is not the owner"
         );
         
-        await TransferRulesInstance.dailyRate(BigNumber(100*1e18), 1, {from: accountTen});
+        await this.TransferRulesInstance.dailyRate(BigNumber(100*1e18), 1, {from: accountTen});
         
         await sendAndCheckCorrectBalance(TradedTokenContractMockInstance, accountOne, accountFourth, BigNumber(200*1e18), "Iteration#1");
         
@@ -501,6 +507,7 @@ contract('TransferRules', (accounts) => {
 
     });
 
+
     it('summary transactions cost', async () => {
         
         //
@@ -509,5 +516,5 @@ contract('TransferRules', (accounts) => {
         
     });
 
-   
+  /**/
 });
