@@ -5,8 +5,9 @@ import "@openzeppelin/contracts-upgradeable/token/ERC777/ERC777Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./interfaces/ITransferRules.sol";
+import "./IntercoinTrait.sol";
 
-contract TradedTokenContract is ERC777Upgradeable, OwnableUpgradeable {
+contract TradedTokenContract is ERC777Upgradeable, OwnableUpgradeable, IntercoinTrait {
     using SafeMathUpgradeable for uint256;
 
     /**
