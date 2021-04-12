@@ -1,0 +1,7 @@
+/build
+/node_modules
+artifacts
+.secret
+/contracts/tests
+.env
+.deps
